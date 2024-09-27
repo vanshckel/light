@@ -1,44 +1,30 @@
-name: Go Cross-Compile Release
+name: Go Release
 
 on:
   push:
     tags:
-      - v*
+      - 'v*'
 
 jobs:
   build:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         goos: [linux, windows]
-        goarch: [386, amd64]
-        exclude:
-          - goos: linux
-            goarch: 386
-
-    runs-on: ubuntu-latest
+        goarch: [386,amd64] # You can add more architectures if needed
     steps:
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: '^1.23.1'
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Check out code
-      uses: actions/checkout@v2
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.19' # Replace with your desired Go version
 
-    - name: Build
-      run: |
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags "-s -w" -o ./bin/${GOOS}_${GOARCH}/light light.go
+      - name: Build
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o light-${{ matrix.goos }}-${{ matrix.goarch }} ./light.go# Replace myapp with your binary name
 
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: light_${{ matrix.goos }}_${{ matrix.goarch }}
-        path: ./bin/${GOOS}_${GOARCH}/light
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -50,45 +36,13 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Download all Artifacts
-        uses: actions/download-artifact@v3
-
-      - name: Upload Release Asset Linux AMD64
+      - name: Upload Release Asset
+        id: upload-release-asset 
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: light_linux_amd64/light
-          asset_name: light_linux_amd64
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset Linux 386
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: light_linux_386/light
-          asset_name: light_linux_386
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset Windows AMD64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: light_windows_amd64/light.exe
-          asset_name: light_windows_amd64.exe
-          asset_content_type: application/octet-stream
-
-      - name: Upload Release Asset Windows 386
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: light_windows_386/light.exe
-          asset_name: light_windows_386.exe
+          asset_path: ./light-${{ matrix.goos }}-${{ matrix.goarch }} # Replace myapp with your binary name
+          asset_name: light-${{ matrix.goos }}-${{ matrix.goarch }} # Replace myapp with your desired asset name
           asset_content_type: application/octet-stream
