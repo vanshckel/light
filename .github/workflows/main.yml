@@ -27,7 +27,7 @@ jobs:
 
     - name: Build
       run: |
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags "-s -w" -o ./bin/light${GOOS}_${GOARCH}/light light.go
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags "-s -w" -o ./bin/light_${GOOS}_${GOARCH}/light light.go
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
