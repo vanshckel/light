@@ -23,7 +23,7 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=linux GOARCH=${{ matrix.goarch }} go build -o light-linux-${{ matrix.goarch }} ./
+          GOOS=linux GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o light-linux-${{ matrix.goarch }} ./
 
       - name: Get Release
         id: get_release
@@ -69,7 +69,7 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=windows GOARCH=${{ matrix.goarch }} go build -o light-windows-${{ matrix.goarch }}.exe ./
+          GOOS=windows GOARCH=${{ matrix.goarch }} go build -ldflags="-s -w" -o light-windows-${{ matrix.goarch }}.exe ./
 
       - name: Get Release
         id: get_release
