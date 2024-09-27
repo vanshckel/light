@@ -14,6 +14,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 )
 
+var ERRORFLAG byte = 0
+var ERRORNUM int = 0
+var ERRORINFO4 string = ""
+var ERRORINFO6 string = ""
+
 func main() {
 	// AWS 访问密钥 ID 和密钥
 	awsAccessKeyID := readInput("密钥: ")
@@ -22,6 +27,7 @@ func main() {
 	number, err := readInt("输入开机数量: ")
 	if err != nil {
 		// 如果有错误，输出错误提示并退出
+		ERRORFLAG = 1
 		fmt.Println("输入无效，开机数量请输入一个整数。")
 		fmt.Println("程序执行完毕，按任意键退出...")
 		fmt.Scanln()
@@ -32,6 +38,7 @@ func main() {
 	// 创建AWS会话
 	sess, accountId, err := createSessionAndCheckCredentials(awsAccessKeyID, awsSecretAccessKey, regionName)
 	if err != nil {
+		ERRORFLAG = 2
 		fmt.Println("创建EC2客户端失败，请检查您的AWS凭证和区域代码是否正确。")
 		fmt.Println(err)
 		fmt.Println("按任意键退出...")
@@ -44,7 +51,10 @@ func main() {
 
 	resp, err := ec2Client.DescribeAvailabilityZones(nil)
 	if err != nil {
+		ERRORFLAG = 3
 		fmt.Println("获取可用区失败:", err)
+		fmt.Println("按任意键退出...")
+		fmt.Scanln()
 		return
 	}
 
@@ -90,6 +100,9 @@ func main() {
 			},
 		})
 		if err != nil {
+			ERRORFLAG = 4
+			ERRORNUM = i
+			ERRORINFO4 = err.Error()
 			fmt.Printf("创建实例 %s 失败: %v\n", instanceName, err)
 			fmt.Printf("已经创建%d台机器\n", i)
 			break
@@ -102,11 +115,17 @@ func main() {
 
 	instances, err := getAllInstances(lightsailClient)
 	if err != nil {
+		ERRORFLAG = 5
 		fmt.Println("获取实例列表失败:", err)
+		fmt.Println("若有已启动的机器，将不会删除")
+		fmt.Println("按任意键退出...")
+		fmt.Scanln()
 		return
 	}
 
 	printInstances(instances)
+
+	instancesA := len(instances)
 
 	fmt.Printf("一共成功启动 %d 台机器\n", len(instances))
 
@@ -117,6 +136,8 @@ func main() {
 			InstanceName: instance.Name,
 		})
 		if err != nil {
+			ERRORFLAG = 6
+			ERRORINFO6 = err.Error()
 			fmt.Printf("删除实例 %s 时出错: %v\n", aws.StringValue(instance.Name), err)
 		} else {
 			fmt.Printf("已成功删除实例 %s\n", aws.StringValue(instance.Name))
@@ -128,13 +149,31 @@ func main() {
 
 	instances, err = getAllInstances(lightsailClient)
 	if err != nil {
+		ERRORFLAG = 7
 		fmt.Println("获取实例列表失败:", err)
+		fmt.Printf("可能存在未删除实例")
+		fmt.Println("程序执行完毕，按任意键退出...")
+		fmt.Scanln()
 		return
 	}
 
 	printInstances(instances)
-
+	instancesB := len(instances)
 	fmt.Printf("%s现有 %d 台机器\n", regionName, len(instances))
+
+	fmt.Println("######运行报告总结######")
+	switch ERRORFLAG {
+	case 4:
+		fmt.Println("开机时出现错误")
+		fmt.Printf("一共成功启动%d台机器\n", ERRORNUM)
+		fmt.Printf("错误原因：%v\n", ERRORINFO4)
+	case 6:
+		fmt.Println("删除机器时出现错误")
+		fmt.Printf("可能存在未删除实例\n错误信息：%v", ERRORINFO6)
+	case 0:
+		fmt.Println("运行时未发生任何错误")
+		fmt.Printf("一共成功启动%d台机器\n删除后检查剩余%d台机器", instancesA, instancesB)
+	}
 
 	fmt.Println("程序执行完毕，按任意键退出...")
 	fmt.Scanln()
