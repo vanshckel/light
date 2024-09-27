@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -18,7 +19,14 @@ func main() {
 	awsAccessKeyID := readInput("密钥: ")
 	awsSecretAccessKey := readInput("秘密密钥: ")
 	regionName := readInput("区域代码: ")
-	number, _ := readInt("输入开机数量: ")
+	number, err := readInt("输入开机数量: ")
+	if err != nil {
+		// 如果有错误，输出错误提示并退出
+		fmt.Println("输入无效，开机数量请输入一个整数。")
+		fmt.Println("程序执行完毕，按任意键退出...")
+		fmt.Scanln()
+		return
+	}
 
 	// 创建AWS会话
 	// 创建AWS会话
@@ -171,10 +179,21 @@ func readInput(prompt string) string {
 }
 
 func readInt(prompt string) (int, error) {
+	// 打印提示信息
 	fmt.Print(prompt)
-	var number int
-	_, err := fmt.Scanln(&number)
-	return number, err
+	var input string
+	// 读取用户输入
+	fmt.Scanln(&input)
+
+	// 尝试将输入转换为整数
+	number, err := strconv.Atoi(input)
+	if err != nil {
+		// 如果转换失败，返回错误
+		return 0, err
+	}
+
+	// 成功返回整数和nil错误
+	return number, nil
 }
 
 func createSession(awsAccessKeyID, awsSecretAccessKey, regionName string) (*session.Session, error) {
