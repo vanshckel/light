@@ -20,6 +20,41 @@ var ERRORINFO4 string = ""
 var ERRORINFO6 string = ""
 
 func main() {
+	bundleID_list := []string{
+		"nano_3_0",
+		"micro_3_0",
+		"small_3_0",
+		"medium_3_0",
+		"large_3_0",
+		"xlarge_3_0",
+		"2xlarge_3_0",
+		"4xlarge_3_0",
+		"nano_win_3_0",
+		"micro_win_3_0",
+		"small_win_3_0",
+		"medium_win_3_0",
+		"large_win_3_0",
+		"xlarge_win_3_0",
+		"2xlarge_win_3_0",
+		"4xlarge_win_3_0",
+		"nano_ipv6_3_0",
+		"micro_ipv6_3_0",
+		"small_ipv6_3_0",
+		"medium_ipv6_3_0",
+		"large_ipv6_3_0",
+		"xlarge_ipv6_3_0",
+		"2xlarge_ipv6_3_0",
+		"4xlarge_ipv6_3_0",
+		"nano_win_ipv6_3_0",
+		"micro_win_ipv6_3_0",
+		"small_win_ipv6_3_0",
+		"medium_win_ipv6_3_0",
+		"large_win_ipv6_3_0",
+		"xlarge_win_ipv6_3_0",
+		"2xlarge_win_ipv6_3_0",
+		"4xlarge_win_ipv6_3_0",
+	}
+
 	// AWS 访问密钥 ID 和密钥
 	awsAccessKeyID := readInput("密钥: ")
 	awsSecretAccessKey := readInput("秘密密钥: ")
@@ -33,8 +68,24 @@ func main() {
 		fmt.Scanln()
 		return
 	}
+	bundleID_index, err := readInt2("输入实例配置(输入空默认为2h0.5g——Linux): ")
+	if err != nil {
+		// 如果有错误，输出错误提示并退出
+		ERRORFLAG = 1
+		fmt.Println("输入无效，实例ID请输入一个整数。")
+		fmt.Println("程序执行完毕，按任意键退出...")
+		fmt.Scanln()
+		return
+	}
+	if bundleID_index > 32 && bundleID_index <= 0 {
+		fmt.Println("错误：请输入1-32之间的数值")
+		fmt.Println("程序执行完毕，按任意键退出...")
+		fmt.Scanln()
+		return
+	}
 
-	// 创建AWS会话
+	fmt.Printf("启动实例类型为：%v\n", bundleID_list[bundleID_index-1])
+
 	// 创建AWS会话
 	sess, accountId, err := createSessionAndCheckCredentials(awsAccessKeyID, awsSecretAccessKey, regionName)
 	if err != nil {
@@ -75,8 +126,15 @@ func main() {
 	lightsailClient := lightsail.New(sess)
 
 	// 创建实例，随机分配可用区
+
 	blueprintID := "ubuntu_22_04" // 使用 Ubuntu 22.04 镜像
-	bundleID := "nano_3_0"        // 2h0.5g 实例类型
+	if bundleID_index >= 9 && bundleID_index <= 16 {
+		blueprintID = "windows_server_2022"
+	}
+	if bundleID_index >= 25 && bundleID_index <= 32 {
+		blueprintID = "windows_server_2022"
+	}
+	bundleID := bundleID_list[bundleID_index-1]
 
 	for i := 0; i < number; i++ {
 		instanceName := fmt.Sprintf("lightsail-instance-%d", i+1)
@@ -172,7 +230,7 @@ func main() {
 		fmt.Printf("可能存在未删除实例\n错误信息：%v", ERRORINFO6)
 	case 0:
 		fmt.Println("运行时未发生任何错误")
-		fmt.Printf("一共成功启动%d台机器\n删除后检查剩余%d台机器", instancesA, instancesB)
+		fmt.Printf("一共成功启动%d台机器\n删除后检查剩余%d台机器\n", instancesA, instancesB)
 	}
 
 	fmt.Println("程序执行完毕，按任意键退出...")
@@ -223,6 +281,29 @@ func readInt(prompt string) (int, error) {
 	var input string
 	// 读取用户输入
 	fmt.Scanln(&input)
+
+	// 尝试将输入转换为整数
+	number, err := strconv.Atoi(input)
+	if err != nil {
+		// 如果转换失败，返回错误
+		return 0, err
+	}
+
+	// 成功返回整数和nil错误
+	return number, nil
+}
+
+func readInt2(prompt string) (int, error) {
+	// 打印提示信息
+	fmt.Print(prompt)
+	var input string
+	// 读取用户输入
+	fmt.Scanln(&input)
+
+	// 如果输入为空，返回默认值 1 和 nil 错误
+	if input == "" {
+		return 1, nil
+	}
 
 	// 尝试将输入转换为整数
 	number, err := strconv.Atoi(input)
