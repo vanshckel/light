@@ -20,20 +20,20 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v2
       with:
-        go-version: '^1.15.8'
+        go-version: '^1.23.1'
 
     - name: Check out code
       uses: actions/checkout@v2
 
     - name: Build
       run: |
-        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags "-s -w" -o ./bin/${GOOS}_${GOARCH}/myapp light.go
+        GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -ldflags "-s -w" -o ./bin/light${GOOS}_${GOARCH}/light light.go
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: myapp_${{ matrix.goos }}_${{ matrix.goarch }}
-        path: ./bin/${GOOS}_${GOARCH}/myapp
+        name: light_${{ matrix.goos }}_${{ matrix.goarch }}
+        path: ./bin/${GOOS}_${GOARCH}/light
 
   release:
     needs: build
@@ -59,8 +59,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: myapp_linux_amd64/myapp
-          asset_name: myapp_linux_amd64
+          asset_path: light_linux_amd64/light
+          asset_name: light_linux_amd64
           asset_content_type: application/octet-stream
 
       - name: Upload Release Asset Linux 386
@@ -69,8 +69,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: myapp_linux_386/myapp
-          asset_name: myapp_linux_386
+          asset_path: light_linux_386/light
+          asset_name: light_linux_386
           asset_content_type: application/octet-stream
 
       - name: Upload Release Asset Windows AMD64
@@ -79,8 +79,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: myapp_windows_amd64/myapp.exe
-          asset_name: myapp_windows_amd64.exe
+          asset_path: light_windows_amd64/light.exe
+          asset_name: light_windows_amd64.exe
           asset_content_type: application/octet-stream
 
       - name: Upload Release Asset Windows 386
@@ -89,6 +89,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: myapp_windows_386/myapp.exe
-          asset_name: myapp_windows_386.exe
+          asset_path: light_windows_386/light.exe
+          asset_name: light_windows_386.exe
           asset_content_type: application/octet-stream
