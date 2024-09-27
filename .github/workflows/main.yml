@@ -1,0 +1,74 @@
+name: Go Cross-Compile Release
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        goos: [linux, windows]
+        goarch: [amd64]
+        exclude:
+          - goos: linux
+            goarch: 386
+
+    runs-on: ubuntu-latest
+    name: Go ${{ matrix.goos }} ${{ matrix.goarch }}
+    steps:
+    - name: Set up Go 1.15
+      uses: actions/setup-go@v2
+      with:
+        go-version: '^1.15.8'
+
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Build
+      run: go build -v -ldflags "-s -w" -o ./bin/${GOOS}_${GOARCH}/light light.go
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: myapp_${{ matrix.goos }}_${{ matrix.goarch }}
+        path: ./bin/${GOOS}_${GOARCH}/light
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Download all Artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./light_linux_amd64
+          asset_name: light_linux_amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Asset Windows
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./light_windows_amd64.exe
+          asset_name: light_windows_amd64.exe
+          asset_content_type: application/octet-stream
