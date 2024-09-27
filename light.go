@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/lightsail"
+	"github.com/aws/aws-sdk-go/service/sts"
 )
 
 func main() {
@@ -18,12 +20,18 @@ func main() {
 	regionName := readInput("区域代码: ")
 	number, _ := readInt("输入开机数量: ")
 
-	// EC2 客户端，用于获取可用区信息
-	sess := session.Must(session.NewSession(&aws.Config{
-		Region:      aws.String(regionName),
-		Credentials: credentials.NewStaticCredentials(awsAccessKeyID, awsSecretAccessKey, ""),
-	}))
+	// 创建AWS会话
+	// 创建AWS会话
+	sess, accountId, err := createSessionAndCheckCredentials(awsAccessKeyID, awsSecretAccessKey, regionName)
+	if err != nil {
+		fmt.Println("创建EC2客户端失败，请检查您的AWS凭证和区域代码是否正确。")
+		fmt.Println(err)
+		fmt.Println("按任意键退出...")
+		fmt.Scanln()
+		return
+	}
 
+	fmt.Printf("=========账号ID：%d=========\n", accountId)
 	ec2Client := ec2.New(sess)
 
 	resp, err := ec2Client.DescribeAvailabilityZones(nil)
@@ -37,33 +45,35 @@ func main() {
 		availabilityZones = append(availabilityZones, aws.StringValue(zone.ZoneName))
 	}
 
+	fmt.Println(availabilityZones)
+
 	availabilityZone := readInput("可用区域（输入空默认随机可用区域）：")
-	var randomConf int
+	var randomConf bool
 	if availabilityZone == "" {
 		fmt.Println("使用默认配置，随机可用区")
-		randomConf = 1
+		randomConf = true
 	}
 
 	lightsailClient := lightsail.New(sess)
 
 	// 创建实例，随机分配可用区
 	blueprintID := "ubuntu_22_04" // 使用 Ubuntu 22.04 镜像
-	bundleID := "nano_3_0"       // 2h0.5g 实例类型
+	bundleID := "nano_3_0"        // 2h0.5g 实例类型
 
 	for i := 0; i < number; i++ {
 		instanceName := fmt.Sprintf("lightsail-instance-%d", i+1)
 		var az string
-		if randomConf == 1 {
+		if randomConf {
 			az = availabilityZones[i%len(availabilityZones)]
 		} else {
 			az = availabilityZone
 		}
 
 		_, err := lightsailClient.CreateInstances(&lightsail.CreateInstancesInput{
-			InstanceNames: aws.StringSlice([]string{instanceName}),
+			InstanceNames:    aws.StringSlice([]string{instanceName}),
 			AvailabilityZone: aws.String(az),
-			BlueprintId:       aws.String(blueprintID),
-			BundleId:          aws.String(bundleID),
+			BlueprintId:      aws.String(blueprintID),
+			BundleId:         aws.String(bundleID),
 			Tags: []*lightsail.Tag{
 				{
 					Key:   aws.String("Name"),
@@ -165,4 +175,52 @@ func readInt(prompt string) (int, error) {
 	var number int
 	_, err := fmt.Scanln(&number)
 	return number, err
+}
+
+func createSession(awsAccessKeyID, awsSecretAccessKey, regionName string) (*session.Session, error) {
+	config := aws.Config{
+		Region:      aws.String(regionName),
+		Credentials: credentials.NewStaticCredentials(awsAccessKeyID, awsSecretAccessKey, ""),
+	}
+
+	sess, err := session.NewSession(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	// 验证凭证是否有效
+	_, err = sess.Config.Credentials.Get()
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "NoCredentialProviders" {
+			return nil, fmt.Errorf("未找到凭证")
+		}
+		return nil, fmt.Errorf("获取凭证失败")
+	}
+
+	return sess, nil
+}
+
+func createSessionAndCheckCredentials(awsAccessKeyID, awsSecretAccessKey, regionName string) (*session.Session, *string, error) {
+	config := aws.Config{
+		Region:      aws.String(regionName),
+		Credentials: credentials.NewStaticCredentials(awsAccessKeyID, awsSecretAccessKey, ""),
+	}
+
+	sess, err := session.NewSession(&config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 验证凭证是否有效，并获取账号ID
+	stsSvc := sts.New(sess)
+	getCallerIdentityInput := &sts.GetCallerIdentityInput{}
+	getCallerIdentityOutput, err := stsSvc.GetCallerIdentity(getCallerIdentityInput)
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok && aerr.Code() == "NoCredentialProviders" {
+			return nil, nil, fmt.Errorf("未找到凭证")
+		}
+		return nil, nil, fmt.Errorf("获取凭证失败")
+	}
+
+	return sess, getCallerIdentityOutput.Account, nil
 }
