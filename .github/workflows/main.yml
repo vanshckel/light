@@ -24,7 +24,7 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o light-${{ matrix.goos }}-${{ matrix.goarch }} ./ 
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o light-${{ matrix.goos }}-${{ matrix.goarch }}${{ if eq matrix.goos 'windows' }}.exe{{ end }} ./ 
 
       - name: Get Release
         id: get_release
@@ -50,6 +50,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.get_release.outputs.upload_url }}
-          asset_path: ./light-${{ matrix.goos }}-${{ matrix.goarch }}
-          asset_name: light-${{ matrix.goos }}-${{ matrix.goarch }}
+          asset_path: ./light-${{ matrix.goos }}-${{ matrix.goarch }}${{ if eq matrix.goos 'windows' }}.exe{{ end }}
+          asset_name: light-${{ matrix.goos }}-${{ matrix.goarch }}${{ if eq matrix.goos 'windows' }}.exe{{ end }}
           asset_content_type: application/octet-stream
