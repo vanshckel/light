@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"time"
 
+	"math/rand"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -97,7 +99,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("=========账号ID：%d=========\n", accountId)
+	fmt.Printf("=========账号ID：%s=========\n", *accountId)
 	ec2Client := ec2.New(sess)
 
 	resp, err := ec2Client.DescribeAvailabilityZones(nil)
@@ -136,8 +138,29 @@ func main() {
 	}
 	bundleID := bundleID_list[bundleID_index-1]
 
+	rand.Seed(time.Now().UnixNano())
+	randName := generateRandomString(8)
+
+	instances, err := getAllInstances(lightsailClient)
+	if err != nil {
+		ERRORFLAG = 5
+		fmt.Println("获取实例列表失败:", err)
+		fmt.Println("若有已启动的机器，将不会删除")
+		fmt.Println("按任意键退出...")
+		fmt.Scanln()
+		return
+	}
+
+	fmt.Println("==========启动实例前检查：（这些实例将不会被删除）===========")
+	printInstances(instances)
+	instances0 := len(instances)
+	fmt.Printf("============启动测试前%s区域共有%d台实例===============\n", regionName, instances0)
+
+	fmt.Println("\n====================创建实例=======================")
+	var deleteList []string
 	for i := 0; i < number; i++ {
-		instanceName := fmt.Sprintf("lightsail-instance-%d", i+1)
+		instanceName := fmt.Sprintf("%s-%d", randName, i+1)
+		deleteList = append(deleteList, instanceName)
 		var az string
 		if randomConf {
 			az = availabilityZones[i%len(availabilityZones)]
@@ -171,7 +194,7 @@ func main() {
 	fmt.Println("等待实例启动中，20s后检查实例是否启动成功")
 	time.Sleep(20 * time.Second)
 
-	instances, err := getAllInstances(lightsailClient)
+	instances, err = getAllInstances(lightsailClient)
 	if err != nil {
 		ERRORFLAG = 5
 		fmt.Println("获取实例列表失败:", err)
@@ -185,20 +208,20 @@ func main() {
 
 	instancesA := len(instances)
 
-	fmt.Printf("一共成功启动 %d 台机器\n", len(instances))
+	fmt.Printf("=========一共在%s区域成功启动 %d 台机器===============\n\n", regionName, instancesA-instances0)
 
-	fmt.Println("开始删除实例")
+	fmt.Println("=================开始删除实例===================")
 
-	for _, instance := range instances {
+	for _, instance := range deleteList {
 		_, err := lightsailClient.DeleteInstance(&lightsail.DeleteInstanceInput{
-			InstanceName: instance.Name,
+			InstanceName: &instance,
 		})
 		if err != nil {
 			ERRORFLAG = 6
 			ERRORINFO6 = err.Error()
-			fmt.Printf("删除实例 %s 时出错: %v\n", aws.StringValue(instance.Name), err)
+			fmt.Printf("删除实例 %s 时出错: %v\n", aws.StringValue(&instance), err)
 		} else {
-			fmt.Printf("已成功删除实例 %s\n", aws.StringValue(instance.Name))
+			fmt.Printf("已成功删除实例 %s\n", aws.StringValue(&instance))
 		}
 	}
 
@@ -217,9 +240,9 @@ func main() {
 
 	printInstances(instances)
 	instancesB := len(instances)
-	fmt.Printf("%s现有 %d 台机器\n", regionName, len(instances))
+	fmt.Printf("============%s区域现有 %d 台机器=============\n", regionName, len(instances))
 
-	fmt.Println("######运行报告总结######")
+	fmt.Println("\n\n######运行报告总结######")
 	switch ERRORFLAG {
 	case 4:
 		fmt.Println("开机时出现错误")
@@ -230,7 +253,7 @@ func main() {
 		fmt.Printf("可能存在未删除实例\n错误信息：%v", ERRORINFO6)
 	case 0:
 		fmt.Println("运行时未发生任何错误")
-		fmt.Printf("一共成功启动%d台机器\n删除后检查剩余%d台机器\n", instancesA, instancesB)
+		fmt.Printf("账号%s区域原有%d台实例\n一共成功启动%d台机器\n删除后检查剩余%d台机器\n", regionName, instances0, instancesA-instances0, instancesB)
 	}
 
 	fmt.Println("程序执行完毕，按任意键退出...")
@@ -362,4 +385,18 @@ func createSessionAndCheckCredentials(awsAccessKeyID, awsSecretAccessKey, region
 	}
 
 	return sess, getCallerIdentityOutput.Account, nil
+}
+
+func generateRandomString(length int) string {
+	const charsetLetters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	const charsetAll = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	result := make([]byte, length)
+	// 首字母为字母
+	result[0] = charsetLetters[rand.Intn(len(charsetLetters))]
+	// 其余字母可以为数字或字母
+	for i := 1; i < length; i++ {
+		result[i] = charsetAll[rand.Intn(len(charsetAll))]
+	}
+	return string(result)
 }
